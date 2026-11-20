@@ -2,6 +2,7 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Rooftop Rumble</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Barlow:wght@500;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#14102e;--panel:#221b4d;--line:#3b3182;--ink:#f4efff;--mute:#a9a0d6;--hot:#ff4f8b;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -22,6 +23,7 @@ h2{font:400 1.05em Bungee,Impact,sans-serif;margin:0 0 .4em;color:var(--mute)}
 .btn{font:400 1.3em Bungee,Impact,sans-serif;background:var(--hot);color:#1b0b2a;border:0;border-radius:.6em;padding:.45em 1.4em;cursor:pointer}
 .btn.alt{background:var(--panel);color:var(--ink);border:2px solid var(--line)}
 .card:focus-visible,.btn:focus-visible{outline:3px solid #fff;outline-offset:2px}
+#code{font:400 1.1em Bungee,Impact,sans-serif;width:5em;text-transform:uppercase;text-align:center;border-radius:.5em;border:2px solid var(--line);background:var(--panel);color:var(--ink);padding:.3em}
 .hint{color:var(--mute);font-size:.85em;text-align:center;max-width:56em}
 </style></head>
 <body>
@@ -37,8 +39,10 @@ h2{font:400 1.05em Bungee,Impact,sans-serif;margin:0 0 .4em;color:var(--mute)}
  <div class="row" id="stage"></div>
  <div class="row" id="rule"></div>
  <div class="row" id="stocks"></div>
+ <div class="row" id="net"><button class="btn alt" id="hostb">Host online game</button><input id="code" maxlength="5" placeholder="CODE" aria-label="Room code"><button class="btn alt" id="joinb">Join</button></div>
+ <p class="hint" id="nstat"></p>
  <button class="btn" id="go">Fight</button>
- <p class="hint">Player 1: A/D move, W jump (twice), S drop through, F attack, G special.<br>Player 2: arrow keys, K attack, L special. Knock your rival off the roof. Damage % makes hits send them farther. In the CPU modes, pick a level from 1 (easy) to 5 (hard). The small bar under each % shows when the special is ready. P pauses, M mutes. Gamepads work too: stick or d-pad moves, A jumps, X attacks, B special.</p>
+ <p class="hint">Player 1: A/D move, W jump (twice), S drop through, F attack, G special.<br>Player 2: arrow keys, K attack, L special. Knock your rival off the roof. Damage % makes hits send them farther. In the CPU modes, pick a level from 1 (easy) to 5 (hard). The small bar under each % shows when the special is ready. P pauses, M mutes. Gamepads work too: stick or d-pad moves, A jumps, X attacks, B special.<br>Online (works on the GitHub-hosted copy): the host picks Player 1, the stage and the rules, the guest picks Player 2. Both play with WASD, F and G on their own PC.</p>
 </div>
 <div class="ov" id="end" hidden>
  <h1 id="win"></h1>
@@ -62,7 +66,7 @@ const STAGES=[{n:'Rooftop',g:['#1d1252','#7a2a8f','#ff6a88'],p:[{x:190,y:390,w:5
 const STG=()=>STAGES[sel.stage];let P=STAGES[0].p;
 const MAP=[{l:'KeyA',r:'KeyD',u:'KeyW',d:'KeyS',a:'KeyF',s:'KeyG'},{l:'ArrowLeft',r:'ArrowRight',u:'ArrowUp',d:'ArrowDown',a:'KeyK',s:'KeyL'}];
 const keys={},pr={};let G=null,shake=0,sel={p1:'blaze',p2:'volt',mode:'2p',diff:3,stage:0,rule:'stock',stocks:3};
-addEventListener('keydown',e=>{if(e.code.startsWith('Arrow')||e.code=='Space')e.preventDefault();if(!keys[e.code]){pr[e.code]=1;if(e.code=='KeyM')toggleMute();if((e.code=='KeyP'||e.code=='Escape')&&G&&!G.over)G.paused=!G.paused}keys[e.code]=1});
+addEventListener('keydown',e=>{if(e.target.tagName=='INPUT')return;if(e.code.startsWith('Arrow')||e.code=='Space')e.preventDefault();if(!keys[e.code]){pr[e.code]=1;if(e.code=='KeyM')toggleMute();if((e.code=='KeyP'||e.code=='Escape')&&G&&!G.over&&!net.role)G.paused=!G.paused}keys[e.code]=1});
 addEventListener('keyup',e=>keys[e.code]=0);
 
 /* menu */
@@ -81,16 +85,50 @@ function menu2(){opts('stage','Stage',STAGES.map((s,i)=>[i,s.n]),'stage');opts('
 let AC,mute=false,mus=null;
 function snd(f,d,type,v,sl){if(!AC||mute)return;const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(sl)o.frequency.exponentialRampToValueAtTime(sl,t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(AC.destination);o.start();o.stop(t+d)}
 const SFX={hit:()=>snd(220,.12,'sawtooth',.12,60),jump:()=>snd(300,.1,'square',.04,600),swing:()=>snd(500,.07,'triangle',.05,250),sp:()=>snd(200,.25,'sawtooth',.06,900),ko:()=>snd(400,.6,'sawtooth',.1,40)};
+const SFX0={...SFX};for(const k in SFX)SFX[k]=()=>{if(net.role=='host'&&G)(G.ev=G.ev||[]).push(k);if(net.role!='guest')SFX0[k]()};
 const NOTES=[110,110,165,110,131,131,196,131,98,98,147,98,123,123,185,123];
 function music(on){clearInterval(mus);if(!on)return;let i=0;mus=setInterval(()=>{if(AC&&!mute&&!(G&&G.paused)){snd(NOTES[i%16],.2,'triangle',.05);if(i%4==0)snd(NOTES[i%16]*4,.15,'square',.012)}i++},230)}
 function toggleMute(){mute=!mute;$('mute').textContent=mute?'Sound off':'Sound on'}
 $('mute').onclick=e=>{toggleMute();e.target.blur()};
+/* online play (PeerJS / WebRTC, works on a normal website like GitHub Pages) */
+const net={role:'',peer:null,conn:null,gin:{}},PID='rooftop-rumble-',KEYOF=Object.fromEntries(Object.entries(CH).map(([k,c])=>[c.n,k]));
+function audio(){AC=AC||new(window.AudioContext||window.webkitAudioContext)();AC.resume()}
+function nstat(t){$('nstat').textContent=t}
+function netReset(){try{net.conn&&net.conn.close();net.peer&&net.peer.destroy()}catch(e){}net.role='';net.conn=null;net.peer=null;net.gin={};$('again').style.display=''}
+function leaveNet(m){netReset();G=null;music(false);$('end').hidden=true;$('menu').hidden=false;nstat(m||'')}
+function netIn(){const g=net.gin,o={l:g.l,r:g.r,d:g.d,jump:g.jump,atk:g.atk,sp:g.sp};g.jump=g.atk=g.sp=0;return o}
+function hostGame(){audio();if(!window.Peer)return nstat('Online play could not load. Use the GitHub-hosted copy of the game.');netReset();
+ const code=Math.random().toString(36).slice(2,7).toUpperCase(),p=new Peer(PID+code);net.peer=p;
+ p.on('open',()=>nstat('Room code: '+code+'. Send it to your friend and wait here.'));
+ p.on('error',e=>nstat('Connection problem: '+e.type));
+ p.on('connection',c=>{if(net.conn){c.close();return}net.conn=c;
+  c.on('data',d=>{if(d.hello){sel.p2=CH[d.hello]?d.hello:'volt';sel.mode='2p';if(sel.rule=='surv')sel.rule='stock';net.role='host';start()}
+   else if(d.i){const g=net.gin;g.l=d.i.l;g.r=d.i.r;g.d=d.i.d;g.jump=g.jump||d.i.jump;g.atk=g.atk||d.i.atk;g.sp=g.sp||d.i.sp}});
+  c.on('close',()=>leaveNet('Your friend disconnected.'))})}
+function joinGame(){audio();const code=$('code').value.trim().toUpperCase();if(!code)return nstat('Type the room code first.');
+ if(!window.Peer)return nstat('Online play could not load. Use the GitHub-hosted copy of the game.');netReset();
+ const p=new Peer();net.peer=p;p.on('error',e=>nstat('Could not connect: '+e.type));
+ p.on('open',()=>{const c=p.connect(PID+code,{reliable:true});net.conn=c;nstat('Connecting...');
+  c.on('open',()=>{net.role='guest';sel.mode='2p';$('again').style.display='none';c.send({hello:sel.p2});nstat('Connected');music(true)});
+  c.on('data',onSnap);c.on('close',()=>leaveNet('The host left.'))})}
+$('hostb').onclick=hostGame;$('joinb').onclick=joinGame;
+function snap(){if(!net.conn||!net.conn.open||(G.tick&1))return;
+ const fs=G.f.map(f=>{const k=KEYOF[f.c.n],s=f.sp;return{x:f.x,y:f.y,face:f.face,pct:f.pct,st:f.st,dead:f.dead,inv:f.inv,at:f.at,spc:f.spc,spUsed:f.spUsed,k,alt:f.c.col!==CH[k].col,sp:s?{t:s.t,n:s.n,k:s.k,land:s.land}:null}});
+ net.conn.send({f:fs,pj:G.pj.map(p=>({x:p.x,y:p.y})),ko:G.ko,t:G.t,wave:G.wave,rule:G.rule,over:G.over,msg:G.msg,sh:shake,st:sel.stage,px:P.map(p=>p.x),ev:G.ev});G.ev=[]}
+function onSnap(s){if(!s.f)return;
+ if(!G||!G.net){G={net:1,f:[null,null],pj:[],pt:[],over:0,ko:[0,0],rule:s.rule,wave:1,t:0,st:-1};$('menu').hidden=true}
+ if(G.st!==s.st){G.st=s.st;sel.stage=s.st;P=STAGES[s.st].p.map(p=>({...p,bx:p.x}))}
+ s.px.forEach((x,i)=>{if(P[i])P[i].x=x});
+ s.f.forEach((q,i)=>{const o=G.f[i],near=o&&Math.abs(o.x-q.x)<120&&Math.abs(o.y-q.y)<120;G.f[i]={...q,i,c:q.alt?{...CH[q.k],...ALT[q.k]}:CH[q.k],tx:q.x,ty:q.y,x:near?o.x:q.x,y:near?o.y:q.y}});
+ G.pj=s.pj;G.ko=s.ko;G.t=s.t;G.wave=s.wave;G.rule=s.rule;shake=s.sh||0;(s.ev||[]).forEach(k=>SFX0[k]&&SFX0[k]());
+ if(s.over&&!G.over){G.over=s.over;setTimeout(()=>{if(G&&G.over){$('win').textContent=s.msg||'Game over';$('end').hidden=false}},900)}
+ if(!s.over&&G.over){G.over=0;$('end').hidden=true}}
 /* gamepad */
 const gpPrev={};
 function gp(i){const g=(navigator.getGamepads?navigator.getGamepads():[])[i];if(!g)return{};const b=k=>g.buttons[k]&&g.buttons[k].pressed,ax=g.axes,cur={j:b(0)||b(3),a:b(2)||b(5),s:b(1)||b(7)},p=gpPrev[i]||{};gpPrev[i]=cur;
  return{l:ax[0]<-.4||b(14),r:ax[0]>.4||b(15),d:ax[1]>.6||b(13),jump:cur.j&&!p.j,atk:cur.a&&!p.a,sp:cur.s&&!p.s}}
 /* game end */
-function finish(w,m){if(G.over)return;G.over=w;setTimeout(()=>{$('win').textContent=m;$('end').hidden=false},900)}
+function finish(w,m){if(G.over)return;G.over=w;G.msg=m;setTimeout(()=>{$('win').textContent=m;$('end').hidden=false},900)}
 function death(f,o){
  if(G.rule=='surv'){if(f.i==1){G.wave++;G.lvl=Math.min(5,sel.diff+((G.wave-1)>>1));const ks=Object.keys(CH),kk=ks[Math.random()*ks.length|0];f.c=CH[kk].n==o.c.n?{...CH[kk],...ALT[kk]}:CH[kk];f.st=1;o.pct=Math.max(0,o.pct-30)}else finish(2,'Survived '+(G.wave-1)+' wave'+(G.wave==2?'':'s'));return}
  finish(o.i+1,o.c.n+' wins')}
@@ -102,7 +140,7 @@ function start(){AC=AC||new(window.AudioContext||window.webkitAudioContext)();AC
  if(sel.rule=='surv'&&sel.mode!='cpu'){sel.mode='cpu';modes()}
  P=STG().p.map(p=>({...p,bx:p.x}));
  G={f:[mk(0,sel.p1,390),mk(1,sel.p2,570)],pj:[],pt:[],over:0,rule:sel.rule,ko:[0,0],t:5400,wave:1,lvl:sel.rule=='surv'?sel.diff:0};$('menu').hidden=true;$('end').hidden=true}
-$('go').onclick=start;$('again').onclick=start;$('back').onclick=()=>{music(false);G=null;$('end').hidden=true;$('menu').hidden=false};
+$('go').onclick=start;$('again').onclick=start;$('back').onclick=()=>{music(false);netReset();G=null;$('end').hidden=true;$('menu').hidden=false};
 
 /* helpers */
 const hb=o=>({x:o.x-o.c.w/2,y:o.y-o.c.h,w:o.c.w,h:o.c.h});
@@ -174,11 +212,11 @@ function upd(f,n,o){const c=f.c;
 }
 function step(){G.tick=(G.tick||0)+1;for(const p of P)if(p.amp){const nx=p.bx+Math.sin(G.tick*p.sp)*p.amp;p.dx=nx-p.x;p.x=nx}
  if(G.rule=='time'&&!G.over&&--G.t<=0){const[a,b]=G.ko;finish(a==b?3:a>b?1:2,a==b?'Draw':(a>b?G.f[0]:G.f[1]).c.n+' wins')}
- if(!G.over||G.f.some(f=>f.dead)){const[a,b]=G.f;if(!G.over||!a.dead)upd(a,sel.mode=='cvc'?ai(a,b):inp(0),b);if(!G.over||!b.dead)upd(b,sel.mode!='2p'?ai(b,a):inp(1),a)}
+ if(!G.over||G.f.some(f=>f.dead)){const[a,b]=G.f;if(!G.over||!a.dead)upd(a,sel.mode=='cvc'?ai(a,b):inp(0),b);if(!G.over||!b.dead)upd(b,net.role=='host'?netIn():sel.mode!='2p'?ai(b,a):inp(1),a)}
  for(const p of G.pj){p.x+=p.vx;p.l--;if(hit(G.f[1-p.o],{x:p.x-10,y:p.y-10,w:20,h:20},6,3.5,.5,p.d))p.l=0;spark(p.x,p.y,'#ffd23f',1)}
  G.pj=G.pj.filter(p=>p.l>0);
  for(const q of G.pt){q.x+=q.vx;q.y+=q.vy;q.vy+=.25;q.l--}G.pt=G.pt.filter(q=>q.l>0);
- for(const k in pr)delete pr[k];shake*=.85}
+ for(const k in pr)delete pr[k];shake*=.85;if(net.role=='host')snap()}
 
 /* drawing */
 const rr=(x,y,w,h,r)=>{ctx.beginPath();ctx.roundRect(x,y,w,h,r)};
@@ -222,7 +260,7 @@ function render(){ctx.save();ctx.clearRect(0,0,W,H);ctx.translate((Math.random()
  for(const q of G.pt){ctx.globalAlpha=Math.min(1,q.l/15);ctx.fillStyle=q.col;ctx.fillRect(q.x,q.y,4,4)}ctx.globalAlpha=1;
  ctx.restore();hud(G.f[0],30);hud(G.f[1],W-250);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='22px Bungee,Impact,sans-serif';if(G.rule=='time')ctx.fillText(Math.ceil(G.t/60)+'s',W/2,34);if(G.rule=='surv')ctx.fillText('Wave '+G.wave,W/2,34);ctx.textAlign='left'}
 let last=0,acc=0;
-function loop(t){requestAnimationFrame(loop);if(!G){last=t;return}acc+=Math.min(50,t-last);last=t;while(acc>=16.67){if(!G.paused)step();acc-=16.67}render();
+function loop(t){requestAnimationFrame(loop);if(!G){last=t;return}acc+=Math.min(50,t-last);last=t;if(net.role=='guest'){if(net.conn&&net.conn.open){const i=inp(0);net.conn.send({i:{l:!!i.l,r:!!i.r,d:!!i.d,jump:!!i.jump,atk:!!i.atk,sp:!!i.sp}})}for(const k in pr)delete pr[k];acc=0;G.f.forEach(f=>{if(f&&f.tx!=null){f.x+=(f.tx-f.x)*.5;f.y+=(f.ty-f.y)*.5}})}else{while(acc>=16.67){if(!G.paused)step();acc-=16.67}}render();
  if(G.paused){ctx.fillStyle='#000a';ctx.fillRect(0,0,W,H);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='48px Bungee,Impact,sans-serif';ctx.fillText('Paused',W/2,H/2);ctx.font='18px Barlow,sans-serif';ctx.fillText('P or Esc to resume',W/2,H/2+36);ctx.textAlign='left'}}
 requestAnimationFrame(loop);
 </script>
