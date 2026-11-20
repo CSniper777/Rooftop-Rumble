@@ -16,6 +16,16 @@ canvas{width:100%;height:100%;display:block;border-radius:10px;background:#000}
 .scr{display:flex;flex-direction:column;align-items:center;gap:.9em;width:100%;margin:auto}
 .scr[hidden]{display:none}
 h1.sm{font-size:2em}
+.achgrid{display:flex;flex-wrap:wrap;gap:.8em;justify-content:center;width:100%}
+.achbox{background:var(--panel);border-radius:.7em;padding:.5em .7em}
+.achbox h3{margin:0 0 .3em;font:400 .95em Bungee,Impact,sans-serif;color:var(--mute)}
+.achbox table{border-collapse:separate;border-spacing:.2em}
+.achbox th{font-size:.75em;color:var(--mute);font-weight:700;padding:0 .3em;white-space:nowrap;text-align:left}
+.achbox td{width:1.9em;height:1.6em;text-align:center;border-radius:.3em;background:#14102e;color:var(--mute);font-size:.9em}
+.achbox td.on{background:#2b6b44;color:#fff}
+.dot{display:inline-block;width:.8em;height:.8em;border-radius:50%;margin-right:.35em;vertical-align:-1px}
+.bar{width:20em;max-width:80%;height:.7em;background:var(--panel);border-radius:1em;margin:.4em auto 0;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--hot)}
 .help{font-size:1em;line-height:1.7;text-align:left;max-width:48em}.help b{color:var(--ink)}
 h1{font:400 3.2em/1 Bungee,Impact,sans-serif;margin:0;letter-spacing:.02em;color:var(--hot);text-shadow:.06em .06em 0 #6d2cff}
 h2{font:400 1.05em Bungee,Impact,sans-serif;margin:0 0 .4em;color:var(--mute)}
@@ -41,6 +51,7 @@ h2{font:400 1.05em Bungee,Impact,sans-serif;margin:0 0 .4em;color:var(--mute)}
   <p class="hint">A platform fighter for 1 to 4 players, with teams, CPUs, survival and online play.</p>
   <button class="btn" data-go="fight">Play</button>
   <button class="btn alt" data-go="online">Play online</button>
+  <button class="btn alt" data-go="ach" id="achb">Achievements</button>
   <button class="btn alt" data-go="help">How to play</button>
  </section>
  <section class="scr" id="s-fight" hidden>
@@ -71,6 +82,15 @@ h2{font:400 1.05em Bungee,Impact,sans-serif;margin:0 0 .4em;color:var(--mute)}
   <p class="hint nstat"></p>
   <button class="btn alt" data-go="home">Back</button>
  </section>
+ <section class="scr" id="s-ach" hidden>
+  <h1 class="sm">Achievements</h1>
+  <p class="hint">There is one achievement for every combination of: the fighter you win with, the CPU fighter you beat, the stage, the number of stocks, and the CPU level (1 to 5). To unlock one, win a 1 vs 1 Stock match against that CPU and finish on 0% with all your stocks. Online and Timed matches don&rsquo;t count. Progress is saved in this browser.</p>
+  <div class="hint" id="achsum" style="font-size:1.1em;color:var(--ink)"></div>
+  <div class="pick"><h2>Win as</h2><div class="row" id="achA"></div></div>
+  <div class="pick"><h2>Against CPU</h2><div class="row" id="achB"></div></div>
+  <div class="achgrid" id="achgrid"></div>
+  <div class="row"><button class="btn alt" data-go="home">Back</button><button class="btn alt" id="achreset">Reset progress</button></div>
+ </section>
  <section class="scr" id="s-help" hidden>
   <h1 class="sm">How to play</h1>
   <div class="hint help">
@@ -87,6 +107,7 @@ h2{font:400 1.05em Bungee,Impact,sans-serif;margin:0 0 .4em;color:var(--mute)}
 </div>
 <div class="ov" id="end" hidden>
  <h1 id="win"></h1>
+ <p class="hint" id="achmsg" style="font-size:1.1em;color:var(--ink)"></p>
  <div class="row"><button class="btn" id="again">Rematch</button><button class="btn alt" id="back">Change fighters</button></div>
 </div>
 </div>
@@ -188,17 +209,50 @@ function slotRows(){for(let i=1;i<=4;i++){const box=$('o'+i);box.innerHTML='';co
   const add=(lab,key,list)=>{const h=document.createElement('h2');h.textContent=lab;h.style.cssText='align-self:center;margin:0 .3em 0 0';box.appendChild(h);list.forEach(([k,t])=>{const b=document.createElement('button');b.className='card';b.style.cssText='flex:none;min-width:0';b.innerHTML=`<b>${t}</b>`;b.setAttribute('aria-pressed',sel[key+i]==k);b.onclick=()=>{sel[key+i]=k;menu2()};box.appendChild(b)})};
   add('Control','c',[['hum','Human'],['cpu','CPU'],['none','None']]);if(on)add('Team','t',[['solo','Solo'],['A','Team A'],['B','Team B']])}}
 function tag(f){if(f.dead)return;ctx.textAlign='center';ctx.font='700 14px Barlow,sans-serif';ctx.fillStyle=SC[f.slot];ctx.fillText('P'+(f.slot+1),f.x,f.y-f.c.h-16);if(TCOL[f.team]){ctx.fillStyle=TCOL[f.team];ctx.fillRect(f.x-10,f.y-f.c.h-12,20,3)}ctx.textAlign='left'}
+/* achievements: flawless win vs a CPU, one per fighter x opponent x stage x stocks x CPU level */
+const AKEY='rooftop-rumble-ach-v2';
+let ACH={};try{ACH=JSON.parse(localStorage.getItem(AKEY))||{}}catch(e){}
+function achSave(){try{localStorage.setItem(AKEY,JSON.stringify(ACH))}catch(e){}}
+const PER=()=>STAGES.length*25,NCH=()=>Object.keys(CH).length,AT=()=>NCH()*NCH()*PER();
+const achN=()=>Object.keys(ACH).length,cnt=pre=>Object.keys(ACH).filter(k=>k.startsWith(pre)).length;
+const akey=(a,b,st,sk,lv)=>a+'>'+b+'|'+st+'|'+sk+'|'+lv;
+function checkAch(w){$('achmsg').textContent='';const o=G.f.find(x=>x!==w);
+ if(G.rule!='stock'||G.f.length!=2||net.role||w.cpu||!o.cpu)return;
+ const k=akey(KEYOF[w.c.n],KEYOF[o.c.n],sel.stage,sel.stocks,sel.diff),
+  t=w.c.n+' beat '+o.c.n+' on '+STAGES[sel.stage].n+', '+sel.stocks+' stock'+(sel.stocks>1?'s':'')+', CPU level '+sel.diff;let m;
+ if(w.pct>0||w.st<sel.stocks)m='Almost! Win with 0% damage and all your stocks to unlock: '+t+'.';
+ else if(ACH[k])m='Already unlocked: '+t+'.';
+ else{ACH[k]=1;achSave();m='Achievement unlocked: '+t+'! ('+achN()+' / '+AT()+')'+(achN()==AT()?' You are a Rooftop Legend!':'')}
+ $('achmsg').textContent=m}
+let achA='blaze',achB='blaze';
+function renderAch(){const ks=Object.keys(CH),n=achN(),T=AT();
+ $('achsum').innerHTML='<b>'+n+' / '+T+'</b> achievements'+(n==T?' &mdash; <b>Rooftop Legend!</b>':'')+'<div class="bar"><i style="width:'+(n/T*100)+'%"></i></div>';
+ const tabs=(id,cur,cf,max,set)=>{const box=$(id);box.innerHTML='';ks.forEach(k=>{const b=document.createElement('button'),c=cf(k);b.className='card';b.style.cssText='flex:none;min-width:0';
+  b.innerHTML='<b><span class="dot" style="background:'+CH[k].col+'"></span>'+CH[k].n+'</b><small>'+c+'/'+max+(c==max?' &#9733;':'')+'</small>';
+  b.setAttribute('aria-pressed',cur==k);b.onclick=()=>{set(k);renderAch()};box.appendChild(b)})};
+ tabs('achA',achA,k=>cnt(k+'>'),NCH()*PER(),k=>achA=k);
+ tabs('achB',achB,k=>cnt(achA+'>'+k+'|'),PER(),k=>achB=k);
+ let h='<div class="hint" style="width:100%;text-align:center;color:var(--ink)">'+CH[achA].n+' vs CPU '+CH[achB].n+': <b>'+cnt(achA+'>'+achB+'|')+' / '+PER()+'</b></div>';
+ STAGES.forEach((st,si)=>{let d=0,rows='';
+  for(let sk=1;sk<=5;sk++){rows+='<tr><th>'+sk+' stock'+(sk>1?'s':'')+'</th>';
+   for(let lv=1;lv<=5;lv++){const on=ACH[akey(achA,achB,si,sk,lv)];if(on)d++;
+    rows+='<td class="'+(on?'on':'')+'" title="'+st.n+', '+sk+' stock'+(sk>1?'s':'')+', CPU level '+lv+'" aria-label="'+CH[achA].n+' vs '+CH[achB].n+', '+st.n+', '+sk+' stocks, CPU level '+lv+': '+(on?'done':'not yet')+'">'+(on?'&#10003;':'&middot;')+'</td>'}
+   rows+='</tr>'}
+  h+='<div class="achbox"><h3>'+st.n+' '+d+'/25</h3><table><tr><th></th>'+[1,2,3,4,5].map(l=>'<th>CPU'+l+'</th>').join('')+'</tr>'+rows+'</table></div>'});
+ $('achgrid').innerHTML=h}
+let rc=0;$('achreset').onclick=e=>{const b=e.target;if(!rc){rc=1;b.textContent='Click again to erase all';setTimeout(()=>{rc=0;b.textContent='Reset progress'},3000)}else{ACH={};achSave();rc=0;b.textContent='Reset progress';renderAch()}};
 /* menu screens */
-function show(n){document.querySelectorAll('.scr').forEach(e=>e.hidden=e.id!='s-'+n);$('menu').hidden=false}
+function show(n){document.querySelectorAll('.scr').forEach(e=>e.hidden=e.id!='s-'+n);$('menu').hidden=false;if(n=='ach')renderAch();if(n=='home')$('achb').textContent='Achievements '+achN()+'/'+AT()}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(!b)return;const g=b.dataset.go;
  if(g=='match'){const ol=b.dataset.from=='online';$('go').style.display=ol?'none':'';$('mback').dataset.go=ol?'online':'fight';$('mback').textContent=ol?'Done':'Back'}
  nstat('');show(g)});
+show('home');
 /* game end */
 function finish(w,m){if(G.over)return;G.over=w;G.msg=m;setTimeout(()=>{$('win').textContent=m;$('end').hidden=false},900)}
 function elim(f){
  if(G.rule=='surv'){if(f.i==0){f.dead=1e9;finish(2,'Survived '+(G.wave-1)+' wave'+(G.wave==2?'':'s'))}else{G.wave++;G.lvl=Math.min(5,sel.diff+((G.wave-1)>>1));const ks=Object.keys(CH),kk=ks[Math.random()*ks.length|0],h=G.f[0];f.c=CH[kk].n==h.c.n?{...CH[kk],...ALT[kk]}:CH[kk];f.st=1;h.pct=Math.max(0,h.pct-30)}return}
  f.out=1;f.dead=1e9;const alive=G.f.filter(x=>!x.out);
- if(new Set(alive.map(x=>x.team)).size<=1){const w=alive[0];finish(w?1:3,w?winName(w):'Draw')}}
+ if(new Set(alive.map(x=>x.team)).size<=1){const w=alive[0];if(w)checkAch(w);finish(w?1:3,w?winName(w):'Draw')}}
 
 /* setup */
 const ALT0=0,ALT={blaze:{col:'#3d7bff',acc:'#9fe8ff'},volt:{col:'#c56bff',acc:'#ffe36b'},boulder:{col:'#5f8a5a',acc:'#d7e09a'},zephyr:{col:'#ff8fd0',acc:'#ffffff'},shade:{col:'#7a3bff',acc:'#7dffe0'},rex:{col:'#4fb06a',acc:'#1f4d2b'},sage:{col:'#e8a6ff',acc:'#fff4b0'}};
@@ -206,7 +260,7 @@ function mk(i,ch,x,sl,v){return{i,slot:sl,team:TEAMOF(sl),cpu:sel['c'+(sl+1)]=='
 function start(){const act=startSlots();if(!act)return;AC=AC||new(window.AudioContext||window.webkitAudioContext)();AC.resume();music(true);
  
  P=STG().p.map(p=>({...p,bx:p.x}));
- G={f:act.map((s,i)=>mk(i,sel['p'+(s+1)],FX(i,act.length),s,act.slice(0,i).filter(t=>sel['p'+(t+1)]==sel['p'+(s+1)]).length)),pj:[],pt:[],over:0,rule:sel.rule,ko:[0,0,0,0],t:5400,wave:1,lvl:sel.rule=='surv'?sel.diff:0};if(sel.rule=='surv'){G.f[0].team='s0';G.f[1].team='s1';G.f[1].cpu=true}$('menu').hidden=true;$('end').hidden=true}
+ G={f:act.map((s,i)=>mk(i,sel['p'+(s+1)],FX(i,act.length),s,act.slice(0,i).filter(t=>sel['p'+(t+1)]==sel['p'+(s+1)]).length)),pj:[],pt:[],over:0,rule:sel.rule,ko:[0,0,0,0],t:5400,wave:1,lvl:sel.rule=='surv'?sel.diff:0};if(sel.rule=='surv'){G.f[0].team='s0';G.f[1].team='s1';G.f[1].cpu=true}$('menu').hidden=true;$('end').hidden=true;$('achmsg').textContent=''}
 $('go').onclick=start;$('again').onclick=start;$('back').onclick=()=>{music(false);netReset();G=null;$('end').hidden=true;$('menu').hidden=false;show('fight')};
 
 /* helpers */
