@@ -62,7 +62,8 @@ const CH={
 const STAGES=[{n:'Rooftop',g:['#1d1252','#7a2a8f','#ff6a88'],p:[{x:190,y:390,w:580,m:1},{x:270,y:290,w:150},{x:540,y:290,w:150}]},
 {n:'Tiny Arena',g:['#06203a','#0f5c73','#ffb36b'],p:[{x:340,y:390,w:280,m:1},{x:410,y:280,w:140}]},
 {n:'Skybridge',g:['#12081f','#4a1a6b','#2fd1c5'],p:[{x:280,y:400,w:400,m:1},{x:415,y:290,w:130,amp:260,sp:.02}]},
-{n:'Triple Tower',g:['#1a1030','#8a2a4a','#ffcf6b'],p:[{x:230,y:400,w:500,m:1},{x:260,y:310,w:120},{x:420,y:230,w:120},{x:580,y:310,w:120}]}];
+{n:'Triple Tower',g:['#1a1030','#8a2a4a','#ffcf6b'],p:[{x:230,y:400,w:500,m:1},{x:260,y:310,w:120},{x:420,y:230,w:120},{x:580,y:310,w:120}]},
+{n:'Flat Ground',g:['#0d1b2a','#3a506b','#f4a261'],p:[{x:210,y:390,w:540,m:1}]}];
 const STG=()=>STAGES[sel.stage];let P=STAGES[0].p;
 const MAP=[{l:'KeyA',r:'KeyD',u:'KeyW',d:'KeyS',a:'KeyF',s:'KeyG'},{l:'ArrowLeft',r:'ArrowRight',u:'ArrowUp',d:'ArrowDown',a:'KeyK',s:'KeyL'}];
 const keys={},pr={};let G=null,shake=0,sel={p1:'blaze',p2:'volt',mode:'2p',diff:3,stage:0,rule:'stock',stocks:3};
