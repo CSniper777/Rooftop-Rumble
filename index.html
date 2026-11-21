@@ -84,7 +84,7 @@ h2{font:400 1.05em Bungee,Impact,sans-serif;margin:0 0 .4em;color:var(--mute)}
  </section>
  <section class="scr" id="s-ach" hidden>
   <h1 class="sm">Achievements</h1>
-  <p class="hint">There is one achievement for every combination of: the fighter you win with, the CPU fighter you beat, the stage, the number of stocks, and the CPU level (1 to 5). To unlock one, win a 1 vs 1 Stock match against that CPU and finish on 0% with all your stocks. Online and Timed matches don&rsquo;t count. Progress is saved in this browser.</p>
+  <p class="hint">There is one achievement for every combination of: the fighter you win with, the CPU fighter you beat, the stage, the number of stocks, and the CPU level (1 to 5). To unlock one, win a 1 vs 1 Stock match against that CPU and finish on 0% with all your stocks. Online and Timed matches don&rsquo;t count. Finishing all 125 for one pairing unlocks a color: for example, all of Volt vs CPU Boulder lets Volt wear Boulder&rsquo;s colors, and all of Volt vs CPU Volt unlocks Gold Volt. Pick colors on the Fighters screen. Progress is saved in this browser.</p>
   <div class="hint" id="achsum" style="font-size:1.1em;color:var(--ink)"></div>
   <div class="pick"><h2>Win as</h2><div class="row" id="achA"></div></div>
   <div class="pick"><h2>Against CPU</h2><div class="row" id="achB"></div></div>
@@ -105,6 +105,7 @@ h2{font:400 1.05em Bungee,Impact,sans-serif;margin:0 0 .4em;color:var(--mute)}
   <button class="btn alt" data-go="home">Back</button>
  </section>
 </div>
+<div class="ov" id="pause" hidden><h1 class="sm">Paused</h1><div class="row"><button class="btn" id="resume">Resume</button><button class="btn alt" id="restart">Restart match</button><button class="btn alt" id="quit">Quit match</button></div></div>
 <div class="ov" id="end" hidden>
  <h1 id="win"></h1>
  <p class="hint" id="achmsg" style="font-size:1.1em;color:var(--ink)"></p>
@@ -130,18 +131,18 @@ const STAGES=[{n:'Rooftop',g:['#1d1252','#7a2a8f','#ff6a88'],p:[{x:190,y:390,w:5
 const STG=()=>STAGES[sel.stage];let P=STAGES[0].p;
 const MAP=[{l:'KeyA',r:'KeyD',u:'KeyW',d:'KeyS',a:'KeyF',s:'KeyG'},{l:'ArrowLeft',r:'ArrowRight',u:'ArrowUp',d:'ArrowDown',a:'Comma',s:'Period'},{l:'KeyJ',r:'KeyL',u:'KeyI',d:'KeyK',a:'KeyU',s:'KeyO'},{l:'Numpad4',r:'Numpad6',u:'Numpad8',d:'Numpad5',a:'Numpad1',s:'Numpad2'}];
 const keys={},pr={};let G=null,shake=0,sel={p1:'blaze',p2:'volt',mode:'2p',diff:3,stage:0,rule:'stock',stocks:3,p3:'shade',p4:'rex',c1:'hum',c2:'hum',c3:'none',c4:'none',t1:'solo',t2:'solo',t3:'solo',t4:'solo',of:'blaze'};
-addEventListener('keydown',e=>{if(e.target.tagName=='INPUT')return;if(e.code.startsWith('Arrow')||e.code.startsWith('Numpad')||e.code=='Space')e.preventDefault();if(!keys[e.code]){pr[e.code]=1;if(e.code=='KeyM')toggleMute();if((e.code=='KeyP'||e.code=='Escape')&&G&&!G.over&&!net.role)G.paused=!G.paused}keys[e.code]=1});
+addEventListener('keydown',e=>{if(e.target.tagName=='INPUT')return;if(e.code.startsWith('Arrow')||e.code.startsWith('Numpad')||e.code=='Space')e.preventDefault();if(!keys[e.code]){pr[e.code]=1;if(e.code=='KeyM')toggleMute();if((e.code=='KeyP'||e.code=='Escape')&&G&&!G.over&&!net.role)togglePause()}keys[e.code]=1});
 addEventListener('keyup',e=>keys[e.code]=0);
 
 /* menu */
 function cards(id,key){const box=$(id);box.innerHTML='';
  Object.entries(CH).forEach(([k,c])=>{const b=document.createElement('button');b.className='card';b.innerHTML=`<i style="background:${c.col}"></i><b>${c.n}</b><small>${c.d}</small>`;
-  b.setAttribute('aria-pressed',sel[key]==k);b.onclick=()=>{sel[key]=k;cards(id,key)};box.appendChild(b)})}
+  b.setAttribute('aria-pressed',sel[key]==k);b.onclick=()=>{sel[key]=k;cards(id,key);slotRows()};box.appendChild(b)})}
 function modes(){const box=$('mode');box.innerHTML='';[].forEach(([k,t])=>{const b=document.createElement('button');b.className='card';b.style.flex='none';b.innerHTML=`<b>${t}</b>`;b.setAttribute('aria-pressed',sel.mode==k);b.onclick=()=>{sel.mode=k;modes()};box.appendChild(b)});diffs()}
 function diffs(){const box=$('diff');box.innerHTML='';const sh=[1,2,3,4].some(i=>sel['c'+i]=='cpu')||sel.rule=='surv';box.style.display=sh?'flex':'none';if(!sh)return;
  const l=document.createElement('h2');l.textContent='CPU level';l.style.cssText='align-self:center;margin:0 .4em 0 0';box.appendChild(l);
  for(let i=1;i<=5;i++){const b=document.createElement('button');b.className='card';b.style.flex='none';b.innerHTML=`<b>${i}</b>`;b.setAttribute('aria-pressed',sel.diff==i);b.setAttribute('aria-label','CPU level '+i);b.onclick=()=>{sel.diff=i;diffs()};box.appendChild(b)}}
-cards('p1','p1');cards('p2','p2');cards('p3','p3');cards('p4','p4');cards('of','of');menu2();
+cards('p1','p1');cards('p2','p2');cards('p3','p3');cards('p4','p4');cards('of','of');
 function opts(id,lab,list,key){const box=$(id);box.innerHTML='';const h=document.createElement('h2');h.textContent=lab;h.style.cssText='align-self:center;margin:0 .4em 0 0';box.appendChild(h);
  list.forEach(([k,t])=>{const b=document.createElement('button');b.className='card';b.style.flex='none';b.innerHTML=`<b>${t}</b>`;b.setAttribute('aria-pressed',sel[key]==k);b.onclick=()=>{sel[key]=k;menu2()};box.appendChild(b)})}
 function menu2(){opts('stage','Stage',STAGES.map((s,i)=>[i,s.n]),'stage');opts('rule','Rules',[['stock','Stock'],['time','Timed 90s'],['surv','Survival']],'rule');opts('stocks','Stocks',[1,2,3,4,5].map(n=>[n,''+n]),'stocks');$('stocks').style.display=sel.rule=='time'?'none':'flex';slotRows();modes()}
@@ -207,7 +208,7 @@ function timeUp(){const sc={};G.f.forEach(f=>sc[f.team]=(sc[f.team]||0)+G.ko[f.i
  if(w.length>1)return finish(3,'Draw');finish(1,winName(G.f.find(x=>x.team==w[0])))}
 function slotRows(){for(let i=1;i<=4;i++){const box=$('o'+i);box.innerHTML='';const on=sel['c'+i]!='none';$('p'+i).style.display=on?'flex':'none';
   const add=(lab,key,list)=>{const h=document.createElement('h2');h.textContent=lab;h.style.cssText='align-self:center;margin:0 .3em 0 0';box.appendChild(h);list.forEach(([k,t])=>{const b=document.createElement('button');b.className='card';b.style.cssText='flex:none;min-width:0';b.innerHTML=`<b>${t}</b>`;b.setAttribute('aria-pressed',sel[key+i]==k);b.onclick=()=>{sel[key+i]=k;menu2()};box.appendChild(b)})};
-  add('Control','c',[['hum','Human'],['cpu','CPU'],['none','None']]);if(on)add('Team','t',[['solo','Solo'],['A','Team A'],['B','Team B']])}}
+  add('Control','c',[['hum','Human'],['cpu','CPU'],['none','None']]);if(on){add('Team','t',[['solo','Solo'],['A','Team A'],['B','Team B']]);palBtn(i,box)}}}
 function tag(f){if(f.dead)return;ctx.textAlign='center';ctx.font='700 14px Barlow,sans-serif';ctx.fillStyle=SC[f.slot];ctx.fillText('P'+(f.slot+1),f.x,f.y-f.c.h-16);if(TCOL[f.team]){ctx.fillStyle=TCOL[f.team];ctx.fillRect(f.x-10,f.y-f.c.h-12,20,3)}ctx.textAlign='left'}
 /* achievements: flawless win vs a CPU, one per fighter x opponent x stage x stocks x CPU level */
 const AKEY='rooftop-rumble-ach-v2';
@@ -222,8 +223,17 @@ function checkAch(w){$('achmsg').textContent='';const o=G.f.find(x=>x!==w);
   t=w.c.n+' beat '+o.c.n+' on '+STAGES[sel.stage].n+', '+sel.stocks+' stock'+(sel.stocks>1?'s':'')+', CPU level '+sel.diff;let m;
  if(w.pct>0||w.st<sel.stocks)m='Almost! Win with 0% damage and all your stocks to unlock: '+t+'.';
  else if(ACH[k])m='Already unlocked: '+t+'.';
- else{ACH[k]=1;achSave();m='Achievement unlocked: '+t+'! ('+achN()+' / '+AT()+')'+(achN()==AT()?' You are a Rooftop Legend!':'')}
+ else{ACH[k]=1;achSave();m='Achievement unlocked: '+t+'! ('+achN()+' / '+AT()+')'+(achN()==AT()?' You are a Rooftop Legend!':'');const pre=KEYOF[w.c.n]+'>'+KEYOF[o.c.n]+'|';if(cnt(pre)==PER())m+=' Color unlocked: '+(w.c.n==o.c.n?'Golden '+w.c.n:w.c.n+' in '+o.c.n+' colors')+'!'}
  $('achmsg').textContent=m}
+/* unlockable colors: finish every achievement of fighter A vs CPU B to wear B's colors (A vs A gives Gold) */
+const palsFor=ch=>Object.keys(CH).filter(b=>cnt(ch+'>'+b+'|')==PER()).map(b=>b==ch?'gold':b);
+const PALC=(ch,k)=>k=='gold'?{col:'#ffd76a',acc:'#fff3c4'}:{col:CH[k].col,acc:CH[k].acc};
+const palName=k=>k=='gold'?'Gold':CH[k].n+' colors';
+const PALOF=(ch,v,pal)=>pal&&palsFor(ch).includes(pal)?{...CH[ch],...PALC(ch,pal)}:v?{...CH[ch],...VAR(ch,v)}:CH[ch];
+function palBtn(i,box){const ch=sel['p'+i],L=palsFor(ch);if(sel['k'+i]&&!L.includes(sel['k'+i]))sel['k'+i]='';if(!L.length)return;
+ const h=document.createElement('h2');h.textContent='Color';h.style.cssText='align-self:center;margin:0 .3em 0 .6em';box.appendChild(h);
+ ['',...L].forEach(k=>{const b=document.createElement('button'),c=k?PALC(ch,k):CH[ch];b.className='card';b.style.cssText='flex:none;min-width:0';
+  b.innerHTML='<b><span class="dot" style="background:'+c.col+'"></span>'+(k?palName(k):'Default')+'</b>';b.setAttribute('aria-pressed',(sel['k'+i]||'')==k);b.onclick=()=>{sel['k'+i]=k;menu2()};box.appendChild(b)})}
 let achA='blaze',achB='blaze';
 function renderAch(){const ks=Object.keys(CH),n=achN(),T=AT();
  $('achsum').innerHTML='<b>'+n+' / '+T+'</b> achievements'+(n==T?' &mdash; <b>Rooftop Legend!</b>':'')+'<div class="bar"><i style="width:'+(n/T*100)+'%"></i></div>';
@@ -232,7 +242,7 @@ function renderAch(){const ks=Object.keys(CH),n=achN(),T=AT();
   b.setAttribute('aria-pressed',cur==k);b.onclick=()=>{set(k);renderAch()};box.appendChild(b)})};
  tabs('achA',achA,k=>cnt(k+'>'),NCH()*PER(),k=>achA=k);
  tabs('achB',achB,k=>cnt(achA+'>'+k+'|'),PER(),k=>achB=k);
- let h='<div class="hint" style="width:100%;text-align:center;color:var(--ink)">'+CH[achA].n+' vs CPU '+CH[achB].n+': <b>'+cnt(achA+'>'+achB+'|')+' / '+PER()+'</b></div>';
+ let h='<div class="hint" style="width:100%;text-align:center;color:var(--ink)">'+CH[achA].n+' vs CPU '+CH[achB].n+': <b>'+cnt(achA+'>'+achB+'|')+' / '+PER()+'</b><br>Reward for all 125: '+(achA==achB?'Golden '+CH[achA].n:CH[achA].n+' in '+CH[achB].n+' colors')+(cnt(achA+'>'+achB+'|')==PER()?' (unlocked)':' (locked)')+'</div>';
  STAGES.forEach((st,si)=>{let d=0,rows='';
   for(let sk=1;sk<=5;sk++){rows+='<tr><th>'+sk+' stock'+(sk>1?'s':'')+'</th>';
    for(let lv=1;lv<=5;lv++){const on=ACH[akey(achA,achB,si,sk,lv)];if(on)d++;
@@ -241,12 +251,17 @@ function renderAch(){const ks=Object.keys(CH),n=achN(),T=AT();
   h+='<div class="achbox"><h3>'+st.n+' '+d+'/25</h3><table><tr><th></th>'+[1,2,3,4,5].map(l=>'<th>CPU'+l+'</th>').join('')+'</tr>'+rows+'</table></div>'});
  $('achgrid').innerHTML=h}
 let rc=0;$('achreset').onclick=e=>{const b=e.target;if(!rc){rc=1;b.textContent='Click again to erase all';setTimeout(()=>{rc=0;b.textContent='Reset progress'},3000)}else{ACH={};achSave();rc=0;b.textContent='Reset progress';renderAch()}};
+/* pause */
+function togglePause(){G.paused=!G.paused;$('pause').hidden=!G.paused;if(G.paused)$('resume').focus()}
+$('resume').onclick=togglePause;
+$('restart').onclick=()=>{$('pause').hidden=true;start()};
+$('quit').onclick=()=>{$('pause').hidden=true;music(false);netReset();G=null;show('home')};
 /* menu screens */
-function show(n){document.querySelectorAll('.scr').forEach(e=>e.hidden=e.id!='s-'+n);$('menu').hidden=false;if(n=='ach')renderAch();if(n=='home')$('achb').textContent='Achievements '+achN()+'/'+AT()}
+function show(n){document.querySelectorAll('.scr').forEach(e=>e.hidden=e.id!='s-'+n);$('menu').hidden=false;if(n=='ach')renderAch();if(n=='fight')slotRows();if(n=='home')$('achb').textContent='Achievements '+achN()+'/'+AT()}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(!b)return;const g=b.dataset.go;
  if(g=='match'){const ol=b.dataset.from=='online';$('go').style.display=ol?'none':'';$('mback').dataset.go=ol?'online':'fight';$('mback').textContent=ol?'Done':'Back'}
  nstat('');show(g)});
-show('home');
+show('home');menu2();
 /* game end */
 function finish(w,m){if(G.over)return;G.over=w;G.msg=m;setTimeout(()=>{$('win').textContent=m;$('end').hidden=false},900)}
 function elim(f){
@@ -256,7 +271,7 @@ function elim(f){
 
 /* setup */
 const ALT0=0,ALT={blaze:{col:'#3d7bff',acc:'#9fe8ff'},volt:{col:'#c56bff',acc:'#ffe36b'},boulder:{col:'#5f8a5a',acc:'#d7e09a'},zephyr:{col:'#ff8fd0',acc:'#ffffff'},shade:{col:'#7a3bff',acc:'#7dffe0'},rex:{col:'#4fb06a',acc:'#1f4d2b'},sage:{col:'#e8a6ff',acc:'#fff4b0'}};
-function mk(i,ch,x,sl,v){return{i,slot:sl,team:TEAMOF(sl),cpu:sel['c'+(sl+1)]=='cpu',last:-1,out:0,c:v?{...CH[ch],...VAR(ch,v)}:CH[ch],x,y:P[0].y,vx:0,vy:0,face:x<480?1:-1,gr:true,jj:2,pct:0,st:sel.rule=='time'?99:sel.rule=='surv'&&i?1:sel.stocks,at:0,cd:0,spc:0,sp:null,hs:0,inv:90,drop:0,hit:0,spUsed:false,dead:0}}
+function mk(i,ch,x,sl,v){return{i,slot:sl,team:TEAMOF(sl),cpu:sel['c'+(sl+1)]=='cpu',last:-1,out:0,c:PALOF(ch,v,sel['k'+(sl+1)]),x,y:P[0].y,vx:0,vy:0,face:x<480?1:-1,gr:true,jj:2,pct:0,st:sel.rule=='time'?99:sel.rule=='surv'&&i?1:sel.stocks,at:0,cd:0,spc:0,sp:null,hs:0,inv:90,drop:0,hit:0,spUsed:false,dead:0}}
 function start(){const act=startSlots();if(!act)return;AC=AC||new(window.AudioContext||window.webkitAudioContext)();AC.resume();music(true);
  
  P=STG().p.map(p=>({...p,bx:p.x}));
